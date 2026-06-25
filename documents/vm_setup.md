@@ -1,55 +1,47 @@
-# VM Setup
+# VM Setup Guide
 
 ## Purpose
 
-This VM acts as the middleware between Google Drive and the Neon PostgreSQL database.
+This virtual machine acts as the middleware between the Google Shared Drive and the Neon PostgreSQL database. It is responsible for automatically synchronizing, validating, and uploading CSV files into the database.
 
-Responsibilities:
-- Sync CSV files from Google Drive
-- Stage files locally
-- Validate files
-- Upload files into PostgreSQL
-- Log pipeline activity
+The VM is **not intended to be permanent storage**. Its primary purpose is to process incoming data and maintain pipeline logs.
 
 ---
 
-## VM Information
+# VM Information
 
-Provider: Google Cloud Platform (GCP)
-
-OS:
-Ubuntu 24.04 LTS Minimal (x86/64)
-
-Machine Type:
-e2-small
-
-Region:
-us-west1
-
-Disk:
-20 GB
+| Setting | Value |
+|---------|-------|
+| Provider | Google Cloud Platform (GCP) |
+| Operating System | Ubuntu 24.04 LTS Minimal (x86/64) |
+| Machine Type | e2-small |
+| Region | us-west1 |
+| Disk Size | 20 GB |
 
 ---
 
-## Initial Package Installation
+# Initial Package Installation
 
 ```bash
 sudo apt update
+
 sudo apt install python3-venv python3-pip rclone git -y
 ```
 
 ---
 
-## Folder Structure
+# Project Structure
 
 ```text
 ~/lc-database
 │
 ├── data_6_mems/
+│   │
 │   ├── scripts/
 │   │   ├── data_6_mems_sync.py
 │   │   ├── data_6_mems_fw.py
-│   │   └── data_6_mems_du.py
+│   │   ├── data_6_mems_du.py
+│   │   └── run_data_6_mems_pipeline.py
 │   │
 │   ├── runtime/
 │   │   ├── staging/
@@ -61,14 +53,16 @@ sudo apt install python3-venv python3-pip rclone git -y
 │       └── processed.txt
 │
 ├── config/
-│   └── .env
+│   ├── .env
+│   ├── rclone.conf.backup
+│   └── rclone_reconnect_notes.md
 │
 └── venv/
 ```
 
 ---
 
-## Create Folder Structure
+# Create Folder Structure
 
 ```bash
 mkdir -p ~/lc-database/data_6_mems/scripts
@@ -88,7 +82,7 @@ touch ~/lc-database/config/.env
 
 ---
 
-## Python Environment
+# Python Environment
 
 ```bash
 cd ~/lc-database
@@ -101,16 +95,17 @@ pip install psycopg[binary]
 pip install python-dotenv
 ```
 
-Verification:
+Verify installation:
 
 ```bash
 which python
+
 pip list
 ```
 
 ---
 
-## RClone Setup
+# Configure Google Drive (RClone)
 
 Create a new remote:
 
@@ -133,7 +128,7 @@ Verify access:
 rclone lsd LC_GD:
 ```
 
-Verify Data_6_MEMS:
+Verify the Data_6_MEMS folder:
 
 ```bash
 rclone lsf LC_GD:Data_6_MEMS --files-only --max-depth 1
@@ -141,140 +136,151 @@ rclone lsf LC_GD:Data_6_MEMS --files-only --max-depth 1
 
 ---
 
-## Pipeline Architecture
+# Pipeline Overview
 
 ```text
-Google Drive
-        ↓
-data_6_mems_sync.py
-        ↓
+Google Shared Drive
+        │
+        ▼
+RClone Sync
+        │
+        ▼
 runtime/staging
-        ↓
-data_6_mems_fw.py
-        ↓
-data_6_mems_du.py
-        ↓
+        │
+        ▼
+Watcher
+        │
+        ▼
+Uploader
+        │
+        ▼
 Neon PostgreSQL
 ```
 
 ---
 
-## Script Responsibilities
+# Script Responsibilities
 
-### data_6_mems_sync.py
+## data_6_mems_sync.py
 
 Purpose:
 
-```text
-Google Drive → staging
+```
+Google Drive → runtime/staging
 ```
 
 Responsibilities:
-- Connect to Google Drive using rclone
-- Copy CSV files into staging
-- Skip subfolders
-- Support recent-file syncing
-- Support full historical syncing
-- Log all actions
 
-Examples:
+- Connect to Google Drive using RClone
+- Synchronize CSV files
+- Support recent-file synchronization
+- Support full historical synchronization
+- Ignore unsupported folders
+- Log synchronization activity
 
-```bash
-python data_6_mems_sync.py --dry-run
-```
+Example:
 
 ```bash
 python data_6_mems_sync.py
 ```
 
+Recent files only.
+
 ```bash
 python data_6_mems_sync.py --all
 ```
 
-```bash
-python data_6_mems_sync.py --all --dry-run
-```
+Historical synchronization.
 
 ---
 
-### data_6_mems_fw.py
+## data_6_mems_fw.py
 
 Purpose:
 
-```text
-staging → process files
+```
+runtime/staging → processing
 ```
 
 Responsibilities:
+
 - Scan staging folder
-- Detect new files
-- Skip already processed files
-- Verify files are stable
+- Wait for files to finish copying
+- Skip previously processed files
 - Call uploader
-- Move successful files to uploaded
-- Move failed files to failed
-- Maintain processed tracking
-- Log all actions
-
-Example:
-
-```bash
-python data_6_mems_fw.py --dry-run
-```
+- Move successful uploads to `uploaded`
+- Move failed uploads to `failed`
+- Maintain `processed.txt`
+- Log all activity
 
 ---
 
-### data_6_mems_du.py
+## data_6_mems_du.py
 
 Purpose:
 
-```text
-CSV validation + database upload
+```
+CSV validation + PostgreSQL upload
 ```
 
 Responsibilities:
-- Validate CSV
-- Add source_file column
-- Validate encoding
-- Validate structure
-- Prepare COPY upload data
-- Upload into PostgreSQL
 
-Example:
+- Validate UTF-8 encoding
+- Validate CSV structure
+- Add `source_file`
+- Validate database schema
+- Upload using PostgreSQL COPY
+- Log upload results
 
-```bash
-python data_6_mems_du.py example.csv --dry-run
+---
+
+## run_data_6_mems_pipeline.py
+
+Purpose:
+
+Run the complete ingestion pipeline.
+
+Workflow:
+
+```
+sync
+    ↓
+watcher
+    ↓
+uploader
 ```
 
----
-
-## Runtime Folders
-
-### staging/
-
-Temporary holding area for newly synced files.
-
-Files enter here after sync.
+This wrapper is executed manually or automatically by the scheduler.
 
 ---
 
-### uploaded/
+# Runtime Folders
 
-Files move here after successful upload.
+## staging/
 
-Used for audit/history.
-
----
-
-### failed/
-
-Files move here if upload fails.
-
-Used for troubleshooting.
+Temporary holding location for newly synchronized CSV files.
 
 ---
 
-## Logging
+## uploaded/
+
+Contains files successfully uploaded into PostgreSQL.
+
+---
+
+## failed/
+
+Contains files rejected during processing.
+
+Reasons may include:
+
+- Empty CSV (header only)
+- Invalid formatting
+- Database validation errors
+
+---
+
+# Logging
 
 Pipeline log:
 
@@ -290,90 +296,78 @@ Processed tracking:
 
 Purpose:
 
-```text
-pipeline.log
-    Records all pipeline actions
-
-processed.txt
-    Prevents duplicate processing
-```
+- Record pipeline activity
+- Record upload results
+- Prevent duplicate processing
 
 ---
 
-## Testing Commands
+# Automation
 
-Test sync:
+The pipeline is fully automated using a **systemd timer**.
+
+Every **5 minutes**, the timer executes:
+
+```
+run_data_6_mems_pipeline.py
+```
+
+The wrapper automatically performs:
+
+1. Google Drive synchronization
+2. CSV validation
+3. Database upload
+4. File organization
+5. Pipeline logging
+
+No manual execution is required during normal operation.
+
+---
+
+# Testing Commands
+
+Test synchronization:
 
 ```bash
-python ~/lc-database/data_6_mems/scripts/data_6_mems_sync.py --dry-run
+python data_6_mems_sync.py --dry-run
 ```
 
 Test watcher:
 
 ```bash
-python ~/lc-database/data_6_mems/scripts/data_6_mems_fw.py --dry-run
+python data_6_mems_fw.py --dry-run
 ```
 
 Test uploader:
 
 ```bash
-python ~/lc-database/data_6_mems/scripts/data_6_mems_du.py \
-~/lc-database/data_6_mems/runtime/staging/<file>.csv \
---dry-run
+python data_6_mems_du.py example.csv --dry-run
 ```
 
-View logs:
+Run the complete pipeline:
 
 ```bash
-tail -n 50 ~/lc-database/data_6_mems/logs/pipeline.log
-```
-
-View processed tracking:
-
-```bash
-cat ~/lc-database/data_6_mems/logs/processed.txt
-```
-
-View staging:
-
-```bash
-ls -lh ~/lc-database/data_6_mems/runtime/staging
-```
-
-View uploaded:
-
-```bash
-ls -lh ~/lc-database/data_6_mems/runtime/uploaded
-```
-
-View failed:
-
-```bash
-ls -lh ~/lc-database/data_6_mems/runtime/failed
+python run_data_6_mems_pipeline.py
 ```
 
 ---
 
-## Known Issues / Lessons Learned
+# Lessons Learned
 
-- Neon free tier is limited to 512 MB.
-- Historical uploads require a paid Neon plan.
-- The original rclone mount approach was abandoned.
-- Copy-based syncing is more reliable and easier to troubleshoot.
-- Dry-run mode must never update processed.txt.
-- Files should only be marked processed after a confirmed successful upload.
-- Google Drive subfolders should be ignored for the Data_6_MEMS pipeline.
-- VM should remain a temporary processing layer, not permanent storage.
+- Neon Free storage is insufficient for historical uploads.
+- COPY-based uploads provide excellent performance for large datasets.
+- Copy-based synchronization is more reliable than mounted Google Drive folders.
+- Files should only be marked as processed after a successful upload.
+- Empty CSV files should be rejected automatically.
+- Duplicate protection should be enforced at the database level using a unique constraint.
+- The VM should remain a processing layer rather than permanent storage.
 
 ---
 
-## Future Improvements
+# Future Improvements
 
-- Add additional data pipelines.
-- Add database user roles.
-- Add team access controls.
-- Create exports folder for all logs and run summaries.
-- Add GitHub export scripts.
-- Add automated reporting.
-- Improve duplicate prevention with database constraints.
-- Add end-to-end automated testing.
+- Add additional ingestion pipelines.
+- Create database roles and user permissions.
+- Export logs and run summaries to GitHub automatically.
+- Generate automated upload reports.
+- Add lock-file protection to prevent overlapping scheduled executions as the pipeline expands.

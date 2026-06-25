@@ -1,14 +1,52 @@
-- improve the failure message 
-- create a wrapper script that will allow pipeline to run automatically
-- ensure that google auth will not break again
-- make sure the wrapper is run every 5 minutes or constantly or something
-- finish documentation and add to github. make sure to include why the 3 files failed to upload. later there should be a feature where it will automatically put this note in the log and then when all logs are automatically uploaded into the github it will be included that way
+# Upload Results
 
+## Summary
 
-The 3 failed files were:
+Testing Date: June 2026
+
+| Item | Result |
+|------|--------|
+| CSV Files Synchronized | 76 |
+| CSV Files Uploaded | 73 |
+| Files Rejected | 3 |
+| Rows Imported | 2,631,529 |
+
+---
+
+## Timestamp Coverage
+
+Earliest:
+
+2026-02-19
+
+Latest:
+
+2026-06-23
+
+---
+
+## Failed Files
+
+The following files were intentionally rejected by the uploader:
+
 - mems_2026_03_19.csv
 - mems_2026_04_16.csv
 - mems_2026_06_01.csv
 
 Reason:
-Each file contained only a header row and no measurement data, so the uploader correctly rejected them and moved them to runtime/failed.
+
+Each file contained only a CSV header and no measurement data.
+
+The pipeline automatically:
+
+- rejected the upload
+- logged the failure
+- moved the file into runtime/failed
+
+No manual intervention was required.
+
+---
+
+## Validation Result
+
+The ingestion pipeline successfully completed a full historical upload and is ready for team testing.
