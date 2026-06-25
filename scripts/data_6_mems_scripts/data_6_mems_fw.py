@@ -111,8 +111,10 @@ def run_upload(csv_path: Path, dry_run: bool) -> bool:
 
     print(f"FAILURE: {csv_path.name}")
     logging.error(
-        f"UPLOAD_FAILURE | file={csv_path.name} | "
-        f"stdout={result.stdout.strip()} | stderr={result.stderr.strip()}"
+        f"FILE_STATUS=FAILED | "
+        f"file={csv_path.name} | "
+        f"reason={result.stdout.strip()} {result.stderr.strip()} | "
+        f"action=Moved to runtime/failed"
     )
     return False
 
@@ -147,13 +149,14 @@ def process_once(dry_run: bool) -> int:
         ok = run_upload(csv_path, dry_run=dry_run)
 
         if ok:
-            mark_processed(key)
-            logging.info(f"MARKED_PROCESSED | key={key}")
-
             if not dry_run:
+                mark_processed(key)
+                logging.info(f"MARKED_PROCESSED | key={key}")
+
                 moved_to = move_with_overwrite(csv_path, UPLOADED)
                 logging.info(f"MOVED_UPLOADED | file={csv_path.name} | destination={moved_to}")
             else:
+                logging.info(f"DRY_RUN_NOT_MARKED_PROCESSED | key={key}")
                 logging.info(f"DRY_RUN_MOVE_UPLOADED | file={csv_path.name}")
         else:
             moved_to = move_with_overwrite(csv_path, FAILED)

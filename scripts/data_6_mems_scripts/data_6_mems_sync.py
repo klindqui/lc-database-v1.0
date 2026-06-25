@@ -70,11 +70,13 @@ def run_sync(max_age: str, dry_run: bool) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Sync recent root-level Data_6_MEMS CSV files from Google Drive into local staging.")
     parser.add_argument("--max-age", default=DEFAULT_MAX_AGE, help="Only copy files modified within this age, e.g. 2d, 12h, 30m.")
+    parser.add_argument("--all", action="store_true", help="Copy all root-level CSVs, ignoring max-age.")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be copied without copying files.")
 
     args = parser.parse_args()
 
-    return run_sync(max_age=args.max_age, dry_run=args.dry_run)
+    max_age = "9999d" if args.all else args.max_age
+    return run_sync(max_age=max_age, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
