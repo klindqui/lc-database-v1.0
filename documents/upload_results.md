@@ -2,7 +2,11 @@
 
 ## Summary
 
-Testing Date: June 2026
+Testing Period: June 2026
+
+---
+
+# Data_6_MEMS
 
 | Item | Result |
 |------|--------|
@@ -15,38 +19,150 @@ Testing Date: June 2026
 
 ## Timestamp Coverage
 
-Earliest:
+Earliest Timestamp
 
+```
 2026-02-19
+```
 
-Latest:
+Latest Timestamp
 
+```
 2026-06-23
+```
 
 ---
 
-## Failed Files
+## Rejected Files
 
-The following files were intentionally rejected by the uploader:
+The following files were intentionally rejected:
 
-- mems_2026_03_19.csv
-- mems_2026_04_16.csv
-- mems_2026_06_01.csv
+- Header-only CSV files
+- Empty datasets
 
-Reason:
+These files were automatically:
 
-Each file contained only a CSV header and no measurement data.
-
-The pipeline automatically:
-
-- rejected the upload
-- logged the failure
-- moved the file into runtime/failed
+- Logged
+- Rejected
+- Moved to `runtime/failed`
 
 No manual intervention was required.
 
 ---
 
-## Validation Result
+# Data_Multi_TICC
 
-The ingestion pipeline successfully completed a full historical upload and is ready for team testing.
+| Item | Result |
+|------|--------|
+| CSV Files Synchronized | 113 |
+| CSV Files Successfully Uploaded | 92 |
+| Files Rejected | 21 |
+
+---
+
+## Supported CSV Formats
+
+The uploader successfully accepted both formats:
+
+```
+tstamp,channel,value
+```
+
+and
+
+```
+tstamp,channel,phase_val
+```
+
+Files using the `phase_val` column were automatically converted to the PostgreSQL schema before upload.
+
+---
+
+## Rejected Files
+
+Rejected files contained unsupported CSV formats, including historical files using alternate multi-channel layouts such as:
+
+```
+tstamp,ch_a,ch_b,ch_c,...
+```
+
+These files were automatically:
+
+- Logged
+- Rejected
+- Moved to `runtime/failed`
+
+No manual cleanup was required.
+
+---
+
+# Duplicate Protection
+
+Both ingestion pipelines successfully prevented duplicate uploads through:
+
+- Database constraints
+- `processed.txt` tracking
+- Automatic duplicate detection
+- Automatic removal of previously processed files from the staging directory
+
+---
+
+# File Organization
+
+Successful uploads were automatically moved into:
+
+```
+runtime/uploaded
+```
+
+Rejected uploads were automatically moved into:
+
+```
+runtime/failed
+```
+
+Previously processed files synchronized from Google Drive were automatically removed from staging before processing.
+
+---
+
+# Logging
+
+Both pipelines successfully recorded:
+
+- Synchronization activity
+- CSV validation
+- Upload success
+- Upload failures
+- Duplicate detection
+- File movement
+- Wrapper execution
+- Pipeline completion
+
+---
+
+# Validation Results
+
+The ingestion framework successfully demonstrated:
+
+- Automated Google Drive synchronization
+- PostgreSQL COPY uploads
+- CSV validation
+- UTF-8 validation
+- Header validation
+- Duplicate prevention
+- Automatic file organization
+- Pipeline logging
+- Independent execution of multiple ingestion pipelines
+
+---
+
+# Final Status
+
+Both ingestion pipelines have completed end-to-end testing and are ready for team use.
+
+Current completed pipelines:
+
+- ✅ Data_6_MEMS
+- ✅ Data_Multi_TICC
+
+Both pipelines are fully automated using systemd timers and execute independently according to their configured schedules.

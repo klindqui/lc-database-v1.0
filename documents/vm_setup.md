@@ -2,9 +2,18 @@
 
 ## Purpose
 
-This virtual machine acts as the middleware between the Google Shared Drive and the Neon PostgreSQL database. It is responsible for automatically synchronizing, validating, and uploading CSV files into the database.
+This virtual machine acts as the middleware between the Google Shared Drives and the Neon PostgreSQL database.
 
-The VM is **not intended to be permanent storage**. Its primary purpose is to process incoming data and maintain pipeline logs.
+Its responsibilities include:
+
+- Synchronizing CSV files from Google Shared Drives
+- Validating incoming data
+- Uploading data into PostgreSQL
+- Organizing processed files
+- Maintaining pipeline logs
+- Preventing duplicate uploads
+
+The VM is **not intended to be permanent storage**. Its purpose is to automate ingestion while acting as a lightweight processing layer.
 
 ---
 
@@ -25,7 +34,7 @@ The VM is **not intended to be permanent storage**. Its primary purpose is to pr
 ```bash
 sudo apt update
 
-sudo apt install python3-venv python3-pip rclone git -y
+sudo apt install python3-venv python3-pip rclone git nano -y
 ```
 
 ---
@@ -36,7 +45,6 @@ sudo apt install python3-venv python3-pip rclone git -y
 ~/lc-database
 │
 ├── data_6_mems/
-│   │
 │   ├── scripts/
 │   │   ├── data_6_mems_sync.py
 │   │   ├── data_6_mems_fw.py
@@ -52,10 +60,28 @@ sudo apt install python3-venv python3-pip rclone git -y
 │       ├── pipeline.log
 │       └── processed.txt
 │
+├── data_multi_ticc/
+│   ├── scripts/
+│   │   ├── data_multi_ticc_sync.py
+│   │   ├── data_multi_ticc_fw.py
+│   │   ├── data_multi_ticc_du.py
+│   │   └── run_data_multi_ticc_pipeline.py
+│   │
+│   ├── runtime/
+│   │   ├── staging/
+│   │   ├── uploaded/
+│   │   └── failed/
+│   │
+│   └── logs/
+│       ├── pipeline.log
+│       └── processed.txt
+│
 ├── config/
 │   ├── .env
 │   ├── rclone.conf.backup
 │   └── rclone_reconnect_notes.md
+│
+├── docs/
 │
 └── venv/
 ```
@@ -66,17 +92,26 @@ sudo apt install python3-venv python3-pip rclone git -y
 
 ```bash
 mkdir -p ~/lc-database/data_6_mems/scripts
-
 mkdir -p ~/lc-database/data_6_mems/runtime/staging
 mkdir -p ~/lc-database/data_6_mems/runtime/uploaded
 mkdir -p ~/lc-database/data_6_mems/runtime/failed
-
 mkdir -p ~/lc-database/data_6_mems/logs
 
+mkdir -p ~/lc-database/data_multi_ticc/scripts
+mkdir -p ~/lc-database/data_multi_ticc/runtime/staging
+mkdir -p ~/lc-database/data_multi_ticc/runtime/uploaded
+mkdir -p ~/lc-database/data_multi_ticc/runtime/failed
+mkdir -p ~/lc-database/data_multi_ticc/logs
+
 mkdir -p ~/lc-database/config
+mkdir -p ~/lc-database/docs
 
 touch ~/lc-database/data_6_mems/logs/pipeline.log
 touch ~/lc-database/data_6_mems/logs/processed.txt
+
+touch ~/lc-database/data_multi_ticc/logs/pipeline.log
+touch ~/lc-database/data_multi_ticc/logs/processed.txt
+
 touch ~/lc-database/config/.env
 ```
 
@@ -128,15 +163,19 @@ Verify access:
 rclone lsd LC_GD:
 ```
 
-Verify the Data_6_MEMS folder:
+Verify available datasets:
 
 ```bash
 rclone lsf LC_GD:Data_6_MEMS --files-only --max-depth 1
+
+rclone lsf LC_GD:Data_Multi_TICC --files-only --max-depth 1
 ```
 
 ---
 
 # Pipeline Overview
+
+Each dataset follows the same ingestion workflow.
 
 ```text
 Google Shared Drive
@@ -159,98 +198,71 @@ Neon PostgreSQL
 
 ---
 
-# Script Responsibilities
+# Pipeline Components
 
-## data_6_mems_sync.py
+Each dataset contains four scripts.
 
-Purpose:
-
-```
-Google Drive → runtime/staging
-```
+## Sync
 
 Responsibilities:
 
-- Connect to Google Drive using RClone
 - Synchronize CSV files
-- Support recent-file synchronization
-- Support full historical synchronization
-- Ignore unsupported folders
-- Log synchronization activity
-
-Example:
-
-```bash
-python data_6_mems_sync.py
-```
-
-Recent files only.
-
-```bash
-python data_6_mems_sync.py --all
-```
-
-Historical synchronization.
+- Support recent-file sync
+- Support historical sync
+- Log synchronization
 
 ---
 
-## data_6_mems_fw.py
-
-Purpose:
-
-```
-runtime/staging → processing
-```
+## Watcher
 
 Responsibilities:
 
-- Scan staging folder
-- Wait for files to finish copying
-- Skip previously processed files
+- Monitor staging folder
+- Wait for stable files
+- Skip duplicates
+- Remove already processed files
 - Call uploader
-- Move successful uploads to `uploaded`
-- Move failed uploads to `failed`
-- Maintain `processed.txt`
-- Log all activity
+- Move uploaded files
+- Move failed files
+- Maintain processed.txt
 
 ---
 
-## data_6_mems_du.py
-
-Purpose:
-
-```
-CSV validation + PostgreSQL upload
-```
+## Uploader
 
 Responsibilities:
 
-- Validate UTF-8 encoding
-- Validate CSV structure
-- Add `source_file`
-- Validate database schema
-- Upload using PostgreSQL COPY
-- Log upload results
+- UTF-8 validation
+- CSV validation
+- Header validation
+- Database schema validation
+- Insert source_file column
+- PostgreSQL COPY upload
+
+The Data_Multi_TICC uploader accepts both:
+
+```
+tstamp,channel,value
+```
+
+and
+
+```
+tstamp,channel,phase_val
+```
+
+Automatically converting `phase_val` to `value` before upload.
 
 ---
 
-## run_data_6_mems_pipeline.py
+## Wrapper
 
-Purpose:
+Responsibilities:
 
-Run the complete ingestion pipeline.
-
-Workflow:
-
-```
-sync
-    ↓
-watcher
-    ↓
-uploader
-```
-
-This wrapper is executed manually or automatically by the scheduler.
+- Execute Sync
+- Execute Watcher
+- Record pipeline execution
+- Log execution status
 
 ---
 
@@ -258,116 +270,105 @@ This wrapper is executed manually or automatically by the scheduler.
 
 ## staging/
 
-Temporary holding location for newly synchronized CSV files.
+Temporary holding location for synchronized CSV files.
 
 ---
 
 ## uploaded/
 
-Contains files successfully uploaded into PostgreSQL.
+Contains successfully uploaded CSV files.
 
 ---
 
 ## failed/
 
-Contains files rejected during processing.
+Contains rejected CSV files.
 
-Reasons may include:
+Examples include:
 
-- Empty CSV (header only)
 - Invalid formatting
-- Database validation errors
+- Empty CSVs
+- Database validation failures
+- Unsupported headers
 
 ---
 
 # Logging
 
-Pipeline log:
+Each dataset maintains:
 
-```text
-~/lc-database/data_6_mems/logs/pipeline.log
 ```
-
-Processed tracking:
-
-```text
-~/lc-database/data_6_mems/logs/processed.txt
+pipeline.log
+processed.txt
 ```
 
 Purpose:
 
-- Record pipeline activity
-- Record upload results
-- Prevent duplicate processing
+- Pipeline history
+- Upload tracking
+- Duplicate prevention
+- Failure reporting
 
 ---
 
 # Automation
 
-The pipeline is fully automated using a **systemd timer**.
+Automation is handled using **systemd timers**.
 
-Every **5 minutes**, the timer executes:
+Current schedule:
 
-```
-run_data_6_mems_pipeline.py
-```
+| Pipeline | Schedule |
+|----------|----------|
+| Data_6_MEMS | 08:00 UTC / 20:00 UTC |
+| Data_Multi_TICC | 08:30 UTC / 20:30 UTC |
 
-The wrapper automatically performs:
-
-1. Google Drive synchronization
-2. CSV validation
-3. Database upload
-4. File organization
-5. Pipeline logging
-
-No manual execution is required during normal operation.
+The timers automatically execute each pipeline wrapper without manual intervention.
 
 ---
 
 # Testing Commands
 
-Test synchronization:
+Example commands:
 
 ```bash
 python data_6_mems_sync.py --dry-run
-```
 
-Test watcher:
-
-```bash
 python data_6_mems_fw.py --dry-run
-```
 
-Test uploader:
-
-```bash
 python data_6_mems_du.py example.csv --dry-run
+
+python run_data_6_mems_pipeline.py
 ```
 
-Run the complete pipeline:
-
 ```bash
-python run_data_6_mems_pipeline.py
+python data_multi_ticc_sync.py --dry-run
+
+python data_multi_ticc_fw.py --dry-run
+
+python data_multi_ticc_du.py example.csv --dry-run
+
+python run_data_multi_ticc_pipeline.py
 ```
 
 ---
 
-# Lessons Learned
+# Design Principles
 
-- Neon Free storage is insufficient for historical uploads.
-- COPY-based uploads provide excellent performance for large datasets.
-- Copy-based synchronization is more reliable than mounted Google Drive folders.
-- Files should only be marked as processed after a successful upload.
-- Empty CSV files should be rejected automatically.
-- Duplicate protection should be enforced at the database level using a unique constraint.
-- The VM should remain a processing layer rather than permanent storage.
+- Independent ingestion pipelines
+- Reliable synchronization
+- Efficient PostgreSQL COPY uploads
+- Automatic duplicate prevention
+- Automatic file organization
+- Comprehensive logging
+- Simple expansion to future datasets
 
 ---
 
 # Future Improvements
 
-- Add additional ingestion pipelines.
-- Create database roles and user permissions.
-- Export logs and run summaries to GitHub automatically.
-- Generate automated upload reports.
-- Add lock-file protection to prevent overlapping scheduled executions as the pipeline expands.
+- Additional ingestion pipelines
+- Database user roles and permissions
+- GitHub log exports
+- Automated execution summaries
+- Pipeline health monitoring
+- Lock-file protection to prevent overlapping executions
