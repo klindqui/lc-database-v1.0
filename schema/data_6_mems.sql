@@ -26,3 +26,20 @@ CREATE TABLE data_6_mems (
 	m5_p INTEGER,
 	m6_p INTEGER
 );
+
+ALTER TABLE public.data_6_mems
+ADD CONSTRAINT data_6_mems_tstamp_unique
+UNIQUE (tstamp);
+
+
+CREATE TABLE data_multi_ticc (
+	id BIGSERIAL PRIMARY KEY,
+	source_file TEXT,
+	tstamp TIMESTAMP NOT NULL,
+	channel TEXT NOT NULL,
+	value DOUBLE PRECISION
+);
+
+ALTER TABLE public.data_multi_ticc
+ADD CONSTRAINT data_multi_ticc_tstamp_channel_unique
+UNIQUE (tstamp, channel);

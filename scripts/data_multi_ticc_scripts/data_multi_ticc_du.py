@@ -1,4 +1,4 @@
-# for data_6_mems
+# for data_multi_ticc 
 # staging --> vm --> database
 # validate CSV, then upload to database 
 # only use on vm
@@ -15,12 +15,12 @@ from psycopg import connect
 from psycopg.rows import dict_row
 
 BASE = Path.home() / "lc-database"
-PIPELINE = BASE / "data_6_mems"
+PIPELINE = BASE / "data_multi_ticc"
 
 LOG_FILE = PIPELINE / "logs" / "pipeline.log"
 ENV_FILE = BASE / "config" / ".env"
 
-TABLE = "public.data_6_mems"
+TABLE = "public.data_multi_ticc"
 
 logging.basicConfig(
     filename=LOG_FILE,
@@ -85,7 +85,26 @@ def read_csv_with_source_file(path: Path) -> tuple[list[str], bytes]:
     except StopIteration:
         raise RuntimeError(f"{path.name}: CSV is empty.")
 
-    new_header = ["source_file"] + header
+    cleaned_header = [col.strip() for col in header]
+    header_lower = [col.lower() for col in cleaned_header]
+
+    valid_headers = [
+        ["tstamp", "channel", "value"],
+        ["tstamp", "channel", "phase_val"],
+    ]
+
+    if header_lower not in valid_headers:
+        raise RuntimeError(
+            "incorrect format. "
+            "Expected one of: "
+            f"{valid_headers}, got={cleaned_header}"
+        )
+
+    # Normalize the third column name so PostgreSQL always receives "value"
+    if header_lower == ["tstamp", "channel", "phase_val"]:
+        cleaned_header[2] = "value"
+
+    new_header = ["source_file"] + cleaned_header
     writer.writerow(new_header)
 
     row_count = 0
@@ -95,8 +114,7 @@ def read_csv_with_source_file(path: Path) -> tuple[list[str], bytes]:
 
     if row_count == 0:
         raise RuntimeError(
-            f"{path.name}: CSV contains only a header row and no measurement data. "
-            f"Upload skipped. File should be moved to runtime/failed for review."
+            f"{path.name}: CSV contains only a header row and no measurement data."
         )
 
     return new_header, output.getvalue().encode("utf-8")
@@ -160,7 +178,7 @@ def upload_file(path: Path, table_name: str, dry_run: bool) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Upload a Data_6_MEMS CSV into PostgreSQL."
+        description="Upload a Data_Multi_TICC CSV into PostgreSQL."
     )
 
     parser.add_argument("path", help="Path to CSV file.")
@@ -168,7 +186,7 @@ def main() -> int:
     parser.add_argument(
         "--table",
         default=TABLE,
-        help="Destination table. Default: public.data_6_mems"
+        help="Destination table. Default: public.data_multi_ticc"
     )
 
     parser.add_argument(

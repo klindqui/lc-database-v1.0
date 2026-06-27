@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 BASE = Path.home() / "lc-database"
-PIPELINE = BASE / "data_6_mems"
+PIPELINE = BASE / "data_multi_ticc"
 
 STAGING = PIPELINE / "runtime" / "staging"
 UPLOADED = PIPELINE / "runtime" / "uploaded"
@@ -18,13 +18,11 @@ FAILED = PIPELINE / "runtime" / "failed"
 LOG_FILE = PIPELINE / "logs" / "pipeline.log"
 PROCESSED_FILE = PIPELINE / "logs" / "processed.txt"
 
-UPLOADER = PIPELINE / "scripts" / "data_6_mems_du.py"
+UPLOADER = PIPELINE / "scripts" / "data_multi_ticc_du.py"
 PYTHON = BASE / "venv" / "bin" / "python"
 
-TABLE = "public.data_6_mems"
-
+TABLE = "public.data_multi_ticc"
 STABLE_CHECK_SECONDS = 2
-
 
 logging.basicConfig(
     filename=LOG_FILE,
@@ -41,12 +39,7 @@ def file_key(path: Path) -> str:
 def load_processed() -> set[str]:
     if not PROCESSED_FILE.exists():
         return set()
-
-    return {
-        line.strip()
-        for line in PROCESSED_FILE.read_text().splitlines()
-        if line.strip()
-    }
+    return {line.strip() for line in PROCESSED_FILE.read_text().splitlines() if line.strip()}
 
 
 def mark_processed(key: str) -> None:
@@ -110,12 +103,20 @@ def run_upload(csv_path: Path, dry_run: bool) -> bool:
         return True
 
     print(f"FAILURE: {csv_path.name}")
-    logging.error(
-        f"FILE_STATUS=FAILED | "
-        f"file={csv_path.name} | "
-        f"reason={result.stdout.strip()} {result.stderr.strip()} | "
-        f"action=Moved to runtime/failed"
-    )
+    combined_error = f"{result.stdout.strip()} {result.stderr.strip()}".strip()
+
+    if "incorrect format" in combined_error.lower():
+        logging.error(
+            f"FILE_STATUS=FAILED | file={csv_path.name} | "
+            f"reason=incorrect format | detail={combined_error} | "
+            f"action=Moved to runtime/failed"
+        )
+    else:
+        logging.error(
+            f"FILE_STATUS=FAILED | file={csv_path.name} | "
+            f"reason={combined_error} | action=Moved to runtime/failed"
+        )
+
     return False
 
 
@@ -142,10 +143,7 @@ def process_once(dry_run: bool) -> int:
 
         if key in processed:
             logging.info(f"SKIPPED_ALREADY_PROCESSED | file={csv_path.name}")
-
-            # Remove duplicate copy from staging
             csv_path.unlink()
-
             logging.info(f"REMOVED_ALREADY_PROCESSED_FROM_STAGING | file={csv_path.name}")
             continue
 
@@ -174,7 +172,7 @@ def process_once(dry_run: bool) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Process staged Data_6_MEMS CSV files.")
+    parser = argparse.ArgumentParser(description="Process staged Data_Multi_TICC CSV files.")
     parser.add_argument("--dry-run", action="store_true", help="Do not upload or move files.")
     args = parser.parse_args()
 
