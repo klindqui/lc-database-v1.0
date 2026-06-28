@@ -364,10 +364,14 @@ python run_data_multi_ticc_pipeline.py
 
 ---
 
+# Database Security
+- Database user roles and permissions
+
+---
+
 # Future Improvements
 
 - Additional ingestion pipelines
-- Database user roles and permissions
 - GitHub log exports
 - Automated execution summaries
 - Pipeline health monitoring

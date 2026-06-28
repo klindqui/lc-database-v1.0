@@ -166,6 +166,12 @@ Current schedule:
 
 ---
 
+## Roles and Users
+- Role-based access control (RBAC)
+- Dedicated service account for automated uploads
+
+--
+
 # Current Status
 
 ## Data_6_MEMS
@@ -222,7 +228,6 @@ Repository documentation includes:
 Potential future enhancements include:
 
 - Additional ingestion pipelines
-- Database user roles and permissions
 - Automated GitHub log exports
 - Pipeline execution summaries
 - Lock-file protection to prevent overlapping executions

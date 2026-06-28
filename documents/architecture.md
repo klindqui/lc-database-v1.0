@@ -2,14 +2,14 @@
 
 ## Overview
 
-The LC Database project currently consists of two independent ingestion pipelines that automatically transfer CSV sensor data from Google Shared Drives into a Neon PostgreSQL database.
+The LC Database project consists of two independent ingestion pipelines that automatically transfer CSV sensor data from Google Shared Drives into a Neon PostgreSQL database.
 
 Current pipelines:
 
 - **Data_6_MEMS**
 - **Data_Multi_TICC**
 
-Although each pipeline processes different datasets, both follow the same ingestion architecture and operate independently.
+Although each pipeline processes different datasets, both follow the same ingestion architecture and operate independently while sharing the same PostgreSQL database.
 
 ---
 
@@ -37,7 +37,8 @@ Although each pipeline processes different datasets, both follow the same ingest
                 └──────────────┬───────────┘
                                │
                                ▼
-                     Neon PostgreSQL Database
+               Neon PostgreSQL Database
+          (RBAC + Service Account Authentication)
 ```
 
 ---
@@ -48,7 +49,7 @@ Each ingestion pipeline consists of four independent scripts.
 
 ## 1. Sync
 
-Purpose:
+Purpose
 
 ```
 Google Shared Drive
@@ -57,12 +58,12 @@ Google Shared Drive
 runtime/staging
 ```
 
-Responsibilities:
+Responsibilities
 
 - Connect to Google Shared Drive using RClone
 - Synchronize new CSV files
 - Support recent-file synchronization
-- Support full historical synchronization
+- Support historical synchronization
 - Ignore unsupported folders
 - Log synchronization activity
 
@@ -70,7 +71,7 @@ Responsibilities:
 
 ## 2. Watcher
 
-Purpose:
+Purpose
 
 ```
 runtime/staging
@@ -79,7 +80,7 @@ runtime/staging
 Process incoming files
 ```
 
-Responsibilities:
+Responsibilities
 
 - Wait for files to finish copying
 - Verify files are stable
@@ -94,7 +95,7 @@ Responsibilities:
 
 ## 3. Uploader
 
-Purpose:
+Purpose
 
 ```
 CSV Validation
@@ -103,7 +104,7 @@ CSV Validation
 PostgreSQL COPY Upload
 ```
 
-Responsibilities:
+Responsibilities
 
 - Verify UTF-8 encoding
 - Validate CSV headers
@@ -112,9 +113,7 @@ Responsibilities:
 - Upload using PostgreSQL COPY
 - Log upload results
 
----
-
-## Data_Multi_TICC Header Support
+### Data_Multi_TICC Header Support
 
 The uploader accepts either of the following headers:
 
@@ -138,7 +137,7 @@ All other formats are rejected and moved to `runtime/failed`.
 
 Each dataset includes a wrapper script that executes the complete ingestion workflow.
 
-Workflow:
+Workflow
 
 ```
 Sync
@@ -212,6 +211,23 @@ Purpose:
 
 ---
 
+# Database Security
+
+Database access is managed using Role-Based Access Control (RBAC).
+
+Current roles include:
+
+- **db_admin** – Full administrative access
+- **db_manager** – Project data management
+- **data_uploader** – Automated ingestion pipelines
+- **data_analyst** – Read-only analysis
+
+The ingestion pipelines do **not** use an administrator account.
+
+Instead, both pipelines authenticate using a dedicated **pipeline service account** assigned to the **data_uploader** role. This follows the Principle of Least Privilege by granting only the permissions required to upload new data.
+
+---
+
 # Scheduling
 
 Both pipelines execute automatically using **systemd timers**.
@@ -234,9 +250,11 @@ The ingestion framework is designed to provide:
 - Automated validation
 - Efficient PostgreSQL bulk uploads
 - Duplicate protection
+- Role-based access control
+- Principle of Least Privilege
 - Automatic file organization
 - Comprehensive logging
-- Easy expansion to additional ingestion pipelines in the future
+- Easy expansion to additional ingestion pipelines
 
 ---
 
@@ -251,4 +269,4 @@ dataset_name/
     logs/
 ```
 
-Each additional dataset can reuse the existing architecture while maintaining independent processing, logging, scheduling, and database tables.
+Each additional dataset can reuse the existing architecture while maintaining independent processing, logging, scheduling, database tables, and security.

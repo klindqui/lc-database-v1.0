@@ -184,4 +184,13 @@
 - [x] Database integration verified
 - [x] Scheduling verified
 - [x] Logging verified
-- [x] Ready for team testing
+- [x] Ready for team 
+
+# Security
+
+- [x] Database roles created
+- [x] Login users created
+- [x] Pipeline service account tested
+- [x] TablePlus login verified
+- [x] Least-privilege uploader verified
+- [x] Sequence permissions verified

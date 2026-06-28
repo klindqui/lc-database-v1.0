@@ -70,10 +70,7 @@ Managers have complete control over project tables but cannot manage database us
 - Insert data
 - Update data
 - Delete data
-- Create tables
-- Modify tables
 - Delete tables
-- Create indexes
 - Create views
 
 ## Restrictions
@@ -227,3 +224,23 @@ The initial deployment will include the following roles:
 Individual user accounts will be assigned to one or more of these roles based on project responsibilities.
 
 This role-based model provides a scalable and maintainable foundation for future database growth.
+
+# Current Implementation
+
+Current roles:
+
+- db_admin
+- db_manager
+- data_uploader
+- data_analyst
+
+Current users:
+
+- katherine → db_admin
+- pipeline_user → data_uploader
+
+The automated ingestion pipelines execute using the dedicated
+pipeline_user service account rather than an administrator account.
+
+This follows the Principle of Least Privilege by granting only the
+permissions required to upload new data.
