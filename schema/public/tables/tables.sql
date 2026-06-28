@@ -1,0 +1,33 @@
+CREATE TABLE IF NOT EXISTS public.data_6_mems (
+    id BIGSERIAL PRIMARY KEY,
+    source_file TEXT,
+    tstamp TIMESTAMP NOT NULL,
+    m1_t DOUBLE PRECISION,
+    m2_t DOUBLE PRECISION,
+    m3_t DOUBLE PRECISION,
+    m4_t DOUBLE PRECISION,
+    m5_t DOUBLE PRECISION,
+    m6_t DOUBLE PRECISION,
+    t_int_1 DOUBLE PRECISION,
+    t_int_2 DOUBLE PRECISION,
+    v1 DOUBLE PRECISION,
+    v2 DOUBLE PRECISION,
+    vcc_1 DOUBLE PRECISION,
+    vcc_2 DOUBLE PRECISION,
+    m1_p INTEGER,
+    m2_p INTEGER,
+    m3_p INTEGER,
+    m4_p INTEGER,
+    m5_p INTEGER,
+    m6_p INTEGER,
+    CONSTRAINT data_6_mems_tstamp_unique UNIQUE (tstamp)
+);
+
+CREATE TABLE IF NOT EXISTS public.data_multi_ticc (
+    id BIGSERIAL PRIMARY KEY,
+    source_file TEXT,
+    tstamp TIMESTAMP NOT NULL,
+    channel TEXT NOT NULL,
+    value DOUBLE PRECISION,
+    CONSTRAINT data_multi_ticc_tstamp_channel_unique UNIQUE (tstamp, channel)
+);
