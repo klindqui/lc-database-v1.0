@@ -13,3 +13,10 @@ PASSWORD 'placeholderpass';
 GRANT db_admin TO katherine;
 
 GRANT data_uploader TO pipeline_user;
+
+-- CREATE ERICA'S USER
+CREATE USER ericaholswade
+WITH LOGIN
+PASSWORD 'placeholderpass';
+
+GRANT db_admin to ericaholswade
